@@ -96,8 +96,6 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
   end
 
   defp format_questions(questions) do
-    questions
-    |> Enum.map(&"- #{&1}")
-    |> Enum.join("\n")
+    Enum.map_join(questions, "\n", &"- #{&1}")
   end
 end
