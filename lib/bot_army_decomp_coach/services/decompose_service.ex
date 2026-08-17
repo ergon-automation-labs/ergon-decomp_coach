@@ -23,7 +23,7 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
     end
   end
 
-  defp load_user_context() do
+  defp load_user_context do
     # Fetch current GTD state, companion reflection history, energy state
     # This would call bridge.task.list, bridge.chat, etc.
     {:ok, %{gtd_active_count: 0, recent_blocks: []}}

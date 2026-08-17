@@ -27,7 +27,7 @@ defmodule BotArmyDecompCoach.NATS.SessionAnchorHandler do
     end
   end
 
-  defp fetch_current_task() do
+  defp fetch_current_task do
     # Call bridge.task.list to find the active task
     # TODO: wire to bridge
     {:ok, %{id: "task-123", title: "Decompose outreach automation", status: "in_progress"}}

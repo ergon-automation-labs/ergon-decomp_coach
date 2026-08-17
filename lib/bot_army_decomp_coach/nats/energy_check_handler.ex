@@ -22,7 +22,7 @@ defmodule BotArmyDecompCoach.NATS.EnergyCheckHandler do
     end
   end
 
-  defp assess_energy() do
+  defp assess_energy do
     # Gather signals:
     # 1. How long have you been focused on current task?
     # 2. Historical patterns (companion reflection)
