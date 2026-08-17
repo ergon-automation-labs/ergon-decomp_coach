@@ -59,24 +59,7 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
         BotArmyRuntime.NATS.Connection.subscribe_to_status()
         Logger.info("Connected to NATS, subscribing to topics")
 
-        subscriptions =
-          [
-            "coach.decompose",
-            "coach.session_anchor",
-            "coach.energy_check"
-          ]
-          |> Enum.map(fn subject ->
-            case Gnat.sub(conn, self(), subject) do
-              {:ok, sub} ->
-                Logger.info("Subscribed to #{subject}")
-                sub
-
-              {:error, reason} ->
-                Logger.error("Failed to subscribe to #{subject}: #{inspect(reason)}")
-                nil
-            end
-          end)
-          |> Enum.filter(&(not is_nil(&1)))
+        subscriptions = subscribe_to_subjects(conn, @subjects)
 
         # Register subjects for runtime discovery
         BotArmyRuntime.Registry.register("decomp_coach", @subjects, @version)
@@ -99,36 +82,7 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
   def handle_info({:msg, msg}, state) do
     BotArmyRuntime.Tracing.with_consumer_span(msg.topic, Map.get(msg, :headers), fn ->
       Logger.debug("Received NATS message on subject: #{msg.topic}")
-
-      # Handle request/reply patterns
-      if msg.reply_to do
-        case msg.topic do
-          "coach.decompose" ->
-            handle_request_reply(msg, state, &BotArmyDecompCoach.NATS.DecomposeHandler.handle/1)
-
-          "coach.session_anchor" ->
-            handle_request_reply(
-              msg,
-              state,
-              &BotArmyDecompCoach.NATS.SessionAnchorHandler.handle/1
-            )
-
-          "coach.energy_check" ->
-            handle_request_reply(msg, state, &BotArmyDecompCoach.NATS.EnergyCheckHandler.handle/1)
-
-          _ ->
-            Logger.debug("Unknown request/reply subject: #{msg.topic}")
-        end
-      else
-        # Handle pub/sub messages
-        case BotArmyCore.NATS.Decoder.decode(msg.body) do
-          {:ok, decoded_message} ->
-            route_message(decoded_message, msg.topic)
-
-          {:error, reason} ->
-            Logger.warning("Failed to decode message from #{msg.topic}: #{inspect(reason)}")
-        end
-      end
+      process_message_type(msg, state)
     end)
 
     {:noreply, state}
@@ -150,6 +104,58 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
   @impl true
   def handle_info(:reconnect, state) do
     {:noreply, state, {:continue, :connect}}
+  end
+
+  # Subscribe to all subjects in @subjects list
+  defp subscribe_to_subjects(conn, subjects) do
+    subjects
+    |> Enum.map(fn %{subject: subject} ->
+      case Gnat.sub(conn, self(), subject) do
+        {:ok, sub} ->
+          Logger.info("Subscribed to #{subject}")
+          sub
+
+        {:error, reason} ->
+          Logger.error("Failed to subscribe to #{subject}: #{inspect(reason)}")
+          nil
+      end
+    end)
+    |> Enum.filter(&(not is_nil(&1)))
+  end
+
+  # Dispatch message based on type (request/reply or pub/sub)
+  defp process_message_type(msg, state) do
+    if msg.reply_to do
+      process_request_reply(msg, state)
+    else
+      process_pubsub(msg)
+    end
+  end
+
+  defp process_request_reply(msg, state) do
+    case msg.topic do
+      "coach.decompose" ->
+        handle_request_reply(msg, state, &BotArmyDecompCoach.NATS.DecomposeHandler.handle/1)
+
+      "coach.session_anchor" ->
+        handle_request_reply(msg, state, &BotArmyDecompCoach.NATS.SessionAnchorHandler.handle/1)
+
+      "coach.energy_check" ->
+        handle_request_reply(msg, state, &BotArmyDecompCoach.NATS.EnergyCheckHandler.handle/1)
+
+      _ ->
+        Logger.debug("Unknown request/reply subject: #{msg.topic}")
+    end
+  end
+
+  defp process_pubsub(msg) do
+    case BotArmyCore.NATS.Decoder.decode(msg.body) do
+      {:ok, decoded_message} ->
+        route_message(decoded_message, msg.topic)
+
+      {:error, reason} ->
+        Logger.warning("Failed to decode message from #{msg.topic}: #{inspect(reason)}")
+    end
   end
 
   # Handle request/reply messages
