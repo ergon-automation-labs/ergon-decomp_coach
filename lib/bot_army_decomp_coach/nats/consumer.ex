@@ -18,9 +18,21 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
 
   # Register subjects with their metadata for runtime discovery
   @subjects [
-    # Add your subjects here:
-    # %{subject: "example.task.list", type: :request_reply, description: "List tasks"},
-    # %{subject: "example.event.>", type: :subscribe, description: "Example events"}
+    %{
+      subject: "coach.decompose",
+      type: :request_reply,
+      description: "Decompose vague project into tasks"
+    },
+    %{
+      subject: "coach.session_anchor",
+      type: :request_reply,
+      description: "Get current task context after switch"
+    },
+    %{
+      subject: "coach.energy_check",
+      type: :request_reply,
+      description: "Check energy level and get recommendation"
+    }
   ]
 
   def start_link(opts) do
@@ -49,7 +61,9 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
 
         subscriptions =
           [
-            # Add your subjects here
+            "coach.decompose",
+            "coach.session_anchor",
+            "coach.energy_check"
           ]
           |> Enum.map(fn subject ->
             case Gnat.sub(conn, self(), subject) do
@@ -89,9 +103,19 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
       # Handle request/reply patterns
       if msg.reply_to do
         case msg.topic do
-          # Add your request/reply handlers here
-          # "example.task.list" ->
-          #   handle_task_list(msg, state)
+          "coach.decompose" ->
+            handle_request_reply(msg, state, &BotArmyDecompCoach.NATS.DecomposeHandler.handle/1)
+
+          "coach.session_anchor" ->
+            handle_request_reply(
+              msg,
+              state,
+              &BotArmyDecompCoach.NATS.SessionAnchorHandler.handle/1
+            )
+
+          "coach.energy_check" ->
+            handle_request_reply(msg, state, &BotArmyDecompCoach.NATS.EnergyCheckHandler.handle/1)
+
           _ ->
             Logger.debug("Unknown request/reply subject: #{msg.topic}")
         end
@@ -126,6 +150,20 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
   @impl true
   def handle_info(:reconnect, state) do
     {:noreply, state, {:continue, :connect}}
+  end
+
+  # Handle request/reply messages
+  defp handle_request_reply(msg, state, handler_fn) do
+    try do
+      response = handler_fn.(msg.body)
+      BotArmyCore.NATS.Connection.pub(state.conn, msg.reply_to, response)
+      Logger.info("Responded to #{msg.topic}")
+    rescue
+      e ->
+        Logger.error("Error handling #{msg.topic}: #{inspect(e)}")
+        error_response = Jason.encode!(%{"error" => inspect(e)})
+        BotArmyCore.NATS.Connection.pub(state.conn, msg.reply_to, error_response)
+    end
   end
 
   # Message routing
