@@ -10,7 +10,7 @@ defmodule BotArmyDecompCoach.NATS.EnergyCheckHandler do
   """
 
   require Logger
-  alias BotArmyCore.NATS
+  alias BotArmyLibraryCore.NATS
 
   def handle(_msg) do
     with {:ok, energy_state} <- assess_energy(),

@@ -149,7 +149,7 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
   end
 
   defp process_pubsub(msg) do
-    case BotArmyCore.NATS.Decoder.decode(msg.body) do
+    case BotArmyLibraryCore.NATS.Decoder.decode(msg.body) do
       {:ok, decoded_message} ->
         route_message(decoded_message, msg.topic)
 
@@ -162,13 +162,13 @@ defmodule BotArmyDecompCoach.NATS.Consumer do
   defp handle_request_reply(msg, state, handler_fn) do
     try do
       response = handler_fn.(msg.body)
-      BotArmyCore.NATS.Connection.pub(state.conn, msg.reply_to, response)
+      BotArmyLibraryCore.NATS.Connection.pub(state.conn, msg.reply_to, response)
       Logger.info("Responded to #{msg.topic}")
     rescue
       e ->
         Logger.error("Error handling #{msg.topic}: #{inspect(e)}")
         error_response = Jason.encode!(%{"error" => inspect(e)})
-        BotArmyCore.NATS.Connection.pub(state.conn, msg.reply_to, error_response)
+        BotArmyLibraryCore.NATS.Connection.pub(state.conn, msg.reply_to, error_response)
     end
   end
 

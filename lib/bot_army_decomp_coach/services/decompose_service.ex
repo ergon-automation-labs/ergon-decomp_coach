@@ -5,7 +5,7 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
   """
 
   require Logger
-  alias BotArmyCore.NATS
+  alias BotArmyLibraryCore.NATS
 
   def handle_request(request) do
     Logger.info("[DecomposeService] Processing: #{request.request_id}")

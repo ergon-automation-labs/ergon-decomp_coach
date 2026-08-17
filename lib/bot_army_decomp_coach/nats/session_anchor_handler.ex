@@ -9,7 +9,7 @@ defmodule BotArmyDecompCoach.NATS.SessionAnchorHandler do
   """
 
   require Logger
-  alias BotArmyCore.NATS
+  alias BotArmyLibraryCore.NATS
 
   def handle(_msg) do
     with {:ok, current_task} <- fetch_current_task(),
