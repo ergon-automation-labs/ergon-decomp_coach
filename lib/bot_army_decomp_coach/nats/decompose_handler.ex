@@ -7,8 +7,8 @@ defmodule BotArmyDecompCoach.NATS.DecomposeHandler do
   """
 
   require Logger
-  alias BotArmyDecompCoach.Services.DecomposeService
   alias BotArmyDecompCoach.Schemas.DecomposeRequest
+  alias BotArmyDecompCoach.Services.DecomposeService
 
   def handle(msg) do
     with {:ok, body} <- Jason.decode(msg),
