@@ -79,14 +79,41 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
   end
 
   defp call_llm(prompt) do
-    # TODO: wire to llm_proxy via NATS
-    {:ok,
-     "1. What's blocking you right now?\n2. What's the first small step?\n3. How much time realistically?"}
+    # Call llm_proxy via NATS request/reply
+    case NATS.request("llm.complete", Jason.encode!(%{"prompt" => prompt}), timeout: 30_000) do
+      {:ok, response} ->
+        case Jason.decode(response.body) do
+          {:ok, %{"result" => text}} -> {:ok, text}
+          {:ok, %{"completion" => text}} -> {:ok, text}
+          {:ok, data} -> {:ok, inspect(data)}
+          {:error, reason} -> {:error, "Failed to decode LLM response: #{inspect(reason)}"}
+        end
+
+      {:error, reason} ->
+        {:error, "LLM request failed: #{inspect(reason)}"}
+    end
   end
 
   defp call_bridge_create_task(body) do
-    # TODO: wire to bridge.task.create via NATS
-    {:ok, %{id: "task-#{System.unique_integer([:positive])}", title: "Decomposed task"}}
+    # Call bridge.task.create via NATS
+    request = %{
+      "title" => "New decomposition task",
+      "description" => body,
+      "status" => "todo"
+    }
+
+    case NATS.request("bridge.task.create", Jason.encode!(request), timeout: 15_000) do
+      {:ok, response} ->
+        case Jason.decode(response.body) do
+          {:ok, %{"task_id" => id}} -> {:ok, %{id: id, title: "New decomposition task"}}
+          {:ok, %{"id" => id}} -> {:ok, %{id: id, title: "New decomposition task"}}
+          {:ok, data} -> {:ok, %{id: "created", title: inspect(data)}}
+          {:error, reason} -> {:error, "Failed to decode task response: #{inspect(reason)}"}
+        end
+
+      {:error, reason} ->
+        {:error, "Task creation failed: #{inspect(reason)}"}
+    end
   end
 
   defp parse_questions(response) do

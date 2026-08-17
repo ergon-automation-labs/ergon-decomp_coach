@@ -9,6 +9,7 @@ defmodule BotArmyDecompCoach.NATS.SessionAnchorHandler do
   """
 
   require Logger
+  alias BotArmyCore.NATS
 
   def handle(_msg) do
     with {:ok, current_task} <- fetch_current_task(),
@@ -29,19 +30,46 @@ defmodule BotArmyDecompCoach.NATS.SessionAnchorHandler do
 
   defp fetch_current_task do
     # Call bridge.task.list to find the active task
-    # TODO: wire to bridge
-    {:ok, %{id: "task-123", title: "Decompose outreach automation", status: "in_progress"}}
+    case NATS.request("bridge.task.list", Jason.encode!(%{}), timeout: 15_000) do
+      {:ok, response} ->
+        case Jason.decode(response.body) do
+          {:ok, %{"tasks" => [%{"id" => id, "title" => title} | _]}} ->
+            {:ok, %{id: id, title: title, status: "in_progress"}}
+
+          {:ok, %{"tasks" => []}} ->
+            {:error, "No active tasks found"}
+
+          {:error, reason} ->
+            {:error, "Failed to decode task list: #{inspect(reason)}"}
+        end
+
+      {:error, reason} ->
+        {:error, "Task list request failed: #{inspect(reason)}"}
+    end
   end
 
   defp build_context_window(current_task) do
-    # Pull context from companion reflection, task history, etc.
-    # TODO: call bridge.chat or companion history
-    {:ok,
-     %{
-       "last_comment" => "Stuck on figuring out what 'automate' means",
-       "time_spent" => "45 minutes",
-       "verification_block" => "Test command: mix test --only handlers"
-     }}
+    # Pull context from bridge.chat (companion reflection/context)
+    case NATS.request(
+           "bridge.chat",
+           Jason.encode!(%{"query" => "What was I working on before? What's the current blocker?"}),
+           timeout: 15_000
+         ) do
+      {:ok, response} ->
+        case Jason.decode(response.body) do
+          {:ok, %{"response" => context}} ->
+            {:ok, %{"last_comment" => context, "task_id" => current_task.id}}
+
+          {:ok, data} ->
+            {:ok, %{"last_comment" => inspect(data), "task_id" => current_task.id}}
+
+          {:error, reason} ->
+            {:error, "Failed to decode context: #{inspect(reason)}"}
+        end
+
+      {:error, reason} ->
+        {:error, "Context request failed: #{inspect(reason)}"}
+    end
   end
 
   defp generate_recommendation(task, context) do
