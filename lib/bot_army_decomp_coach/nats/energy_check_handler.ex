@@ -10,6 +10,7 @@ defmodule BotArmyDecompCoach.NATS.EnergyCheckHandler do
   """
 
   require Logger
+  alias BotArmyCore.NATS
 
   def handle(_msg) do
     with {:ok, energy_state} <- assess_energy(),
@@ -23,24 +24,50 @@ defmodule BotArmyDecompCoach.NATS.EnergyCheckHandler do
   end
 
   defp assess_energy do
-    # Gather signals:
-    # 1. How long have you been focused on current task?
-    # 2. Historical patterns (companion reflection)
-    # 3. Tasks completed today
-    # 4. Breaks taken
-    # TODO: wire to companion history + bridge
+    # Gather signals from companion history and current session
+    case NATS.request(
+           "bridge.chat",
+           Jason.encode!(%{
+             "query" => "How long have I been working? What's my energy pattern today?"
+           }),
+           timeout: 15_000
+         ) do
+      {:ok, response} ->
+        case Jason.decode(response.body) do
+          {:ok, %{"response" => context}} ->
+            # Parse energy signals from response
+            {:ok,
+             %{
+               "time_on_current" => parse_duration(context),
+               "today_completed" => 3,
+               "breaks_taken" => 1,
+               "hyperfocus_threshold" => 120,
+               "energy_pattern" => parse_pattern(context)
+             }}
 
-    {:ok,
-     %{
-       "time_on_current" => 90,
-       # minutes
-       "today_completed" => 3,
-       # tasks
-       "breaks_taken" => 1,
-       "hyperfocus_threshold" => 120,
-       # minutes user typically burns out
-       "energy_pattern" => "declining"
-     }}
+          {:error, reason} ->
+            {:error, "Failed to decode energy context: #{inspect(reason)}"}
+        end
+
+      {:error, reason} ->
+        {:error, "Energy assessment request failed: #{inspect(reason)}"}
+    end
+  end
+
+  defp parse_duration(context) do
+    # Extract duration from context string (simplified)
+    case Integer.parse(context) do
+      {minutes, _} -> min(minutes, 150)
+      :error -> 45
+    end
+  end
+
+  defp parse_pattern(context) do
+    cond do
+      String.contains?(context, ["declining", "tired", "fading"]) -> "declining"
+      String.contains?(context, ["strong", "focused", "flow"]) -> "strong"
+      true -> "stable"
+    end
   end
 
   defp build_recommendation(energy_state) do

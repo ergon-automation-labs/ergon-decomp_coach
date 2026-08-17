@@ -7,8 +7,6 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
   require Logger
   alias BotArmyCore.NATS
 
-  @decompose_subject "coach.decompose"
-
   def handle_request(request) do
     Logger.info("[DecomposeService] Processing: #{request.request_id}")
 
@@ -42,7 +40,6 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
     Keep questions conversational, not robotic.
     """
 
-    # Call llm_proxy
     case call_llm(prompt) do
       {:ok, response} ->
         questions = parse_questions(response)
@@ -54,11 +51,6 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
   end
 
   defp create_gtd_task(request, questions) do
-    # Create GTD task with:
-    # - Title from request
-    # - Context with clarifying questions
-    # - Verification block ready for when they answer
-
     task_body = """
     #{request.user_message}
 
@@ -71,7 +63,6 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
     Test command: nats request --server nats://localhost:4223 bridge.task.list '{}' --timeout 3s
     """
 
-    # Call bridge.task.create
     case call_bridge_create_task(task_body) do
       {:ok, task} -> {:ok, task}
       {:error, reason} -> {:error, reason}
@@ -79,7 +70,6 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
   end
 
   defp call_llm(prompt) do
-    # Call llm_proxy via NATS request/reply
     case NATS.request("llm.complete", Jason.encode!(%{"prompt" => prompt}), timeout: 30_000) do
       {:ok, response} ->
         case Jason.decode(response.body) do
@@ -95,7 +85,6 @@ defmodule BotArmyDecompCoach.Services.DecomposeService do
   end
 
   defp call_bridge_create_task(body) do
-    # Call bridge.task.create via NATS
     request = %{
       "title" => "New decomposition task",
       "description" => body,
