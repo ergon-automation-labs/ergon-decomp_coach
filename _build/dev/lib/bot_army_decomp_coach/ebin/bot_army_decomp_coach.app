@@ -1,5 +1,5 @@
 {application,bot_army_decomp_coach,
-             [{config_mtime,1786978486},
+             [{config_mtime,1788387804},
               {optional_applications,[]},
               {applications,[kernel,stdlib,elixir,logger,
                              bot_army_library_core,bot_army_library_runtime,
@@ -17,5 +17,5 @@
                         'Elixir.BotArmyDecompCoach.Schemas.DecomposeRequest',
                         'Elixir.BotArmyDecompCoach.Services.DecomposeService']},
               {registered,[]},
-              {vsn,"0.1.0"},
+              {vsn,"0.1.6"},
               {mod,{'Elixir.BotArmyDecompCoach.Application',[]}}]}.

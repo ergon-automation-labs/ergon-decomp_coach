@@ -1,5 +1,5 @@
 {application,bot_army_library_learning,
-             [{config_mtime,1786978486},
+             [{config_mtime,1788388154},
               {optional_applications,[]},
               {applications,[kernel,stdlib,elixir,logger,
                              bot_army_library_core,bot_army_library_runtime,
@@ -39,5 +39,5 @@
                         'Elixir.Mix.Tasks.Learning.Deck.New',
                         'Elixir.Mix.Tasks.Learning.Stats']},
               {registered,[]},
-              {vsn,"0.1.38"},
+              {vsn,"0.1.44"},
               {mod,{'Elixir.BotArmyLibraryLearning.Application',[]}}]}.
